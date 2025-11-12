@@ -28,4 +28,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: andyxalarcon/digital_ocean :latest
+          tags: andyxalarcon/digital_ocean:latest
