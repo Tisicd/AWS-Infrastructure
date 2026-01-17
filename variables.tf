@@ -34,6 +34,60 @@ variable "common_tags" {
 }
 
 # =============================================================================
+# Multi-Account AWS Configuration
+# =============================================================================
+
+variable "account_type" {
+  description = "Type of AWS account: 'hub' (central account with shared resources) or 'service' (secondary account for microservices only)"
+  type        = string
+  default     = "hub"
+  validation {
+    condition     = contains(["hub", "service"], var.account_type)
+    error_message = "account_type must be either 'hub' or 'service'."
+  }
+}
+
+variable "account_id" {
+  description = "AWS Account ID (optional, will be auto-detected if not provided)"
+  type        = string
+  default     = ""
+}
+
+variable "hub_account_id" {
+  description = "AWS Account ID of the hub account (required for service accounts)"
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.account_type != "service" || var.hub_account_id != ""
+    error_message = "hub_account_id is required when account_type is 'service'."
+  }
+}
+
+variable "vpc_peering_connection_id" {
+  description = "VPC Peering Connection ID for cross-account communication (optional)"
+  type        = string
+  default     = ""
+}
+
+variable "cross_account_security_group_ids" {
+  description = "List of security group IDs from other accounts for cross-account communication"
+  type        = list(string)
+  default     = []
+}
+
+variable "hub_vpc_cidr" {
+  description = "CIDR block of the hub VPC (for security group rules)"
+  type        = string
+  default     = ""
+}
+
+variable "service_account_vpc_cidrs" {
+  description = "List of CIDR blocks from service account VPCs (for hub account security groups)"
+  type        = list(string)
+  default     = []
+}
+
+# =============================================================================
 # AWS Academy Constraints
 # =============================================================================
 
@@ -109,6 +163,19 @@ variable "your_ip_cidr" {
 variable "key_pair_name" {
   description = "Name of EC2 Key Pair for SSH access"
   type        = string
+  default     = "academic-platform-key"
+}
+
+variable "create_key_pair" {
+  description = "Whether to create a new key pair in AWS (set to false to use existing key pair)"
+  type        = bool
+  default     = true
+}
+
+variable "save_key_pair_locally" {
+  description = "Whether to save the private key to a local file (only if create_key_pair is true)"
+  type        = bool
+  default     = true
 }
 
 # =============================================================================
@@ -149,6 +216,12 @@ variable "bastion_instance_type" {
   default     = "t3.micro"
 }
 
+variable "bastion_root_volume_size" {
+  description = "Size of root volume for Bastion Host in GB (minimum 30GB for Amazon Linux 2023)"
+  type        = number
+  default     = 30
+}
+
 # =============================================================================
 # Database Server Configuration
 # =============================================================================
@@ -172,9 +245,9 @@ variable "database_needs_eip" {
 }
 
 variable "database_root_volume_size" {
-  description = "Size of root volume in GB"
+  description = "Size of root volume in GB (minimum 30GB for Amazon Linux 2023)"
   type        = number
-  default     = 20
+  default     = 30
 }
 
 variable "database_data_volume_size" {
@@ -205,6 +278,18 @@ variable "enable_timescaledb" {
   description = "Enable TimescaleDB extension"
   type        = bool
   default     = true
+}
+
+variable "enable_mongodb" {
+  description = "Enable MongoDB (NoSQL database)"
+  type        = bool
+  default     = true
+}
+
+variable "mongodb_version" {
+  description = "MongoDB version"
+  type        = string
+  default     = "7.0"
 }
 
 variable "database_enable_backups" {
@@ -261,6 +346,48 @@ variable "kong_admin_api_uri" {
   description = "Kong Admin API URI"
   type        = string
   default     = "http://localhost:8001"
+}
+
+variable "kong_enable_asg" {
+  description = "Enable Auto Scaling Group for Kong (if false, uses EC2 instances directly)"
+  type        = bool
+  default     = false
+}
+
+variable "kong_min_size" {
+  description = "Minimum number of Kong instances in ASG"
+  type        = number
+  default     = 1
+}
+
+variable "kong_max_size" {
+  description = "Maximum number of Kong instances in ASG"
+  type        = number
+  default     = 2
+}
+
+variable "kong_desired_capacity" {
+  description = "Desired number of Kong instances in ASG"
+  type        = number
+  default     = 1
+}
+
+variable "kong_health_check_grace_period" {
+  description = "Grace period for Kong health checks (seconds)"
+  type        = number
+  default     = 300
+}
+
+variable "kong_load_balancer_internal" {
+  description = "Whether the Kong load balancer is internal (private) or internet-facing"
+  type        = bool
+  default     = false
+}
+
+variable "kong_allocate_eip_per_instance" {
+  description = "Allocate Elastic IP per Kong instance (only when ASG is disabled)"
+  type        = bool
+  default     = false
 }
 
 # =============================================================================
@@ -331,6 +458,24 @@ variable "microservices_services" {
   ]
 }
 
+variable "microservices_enable_load_balancer" {
+  description = "Enable Application Load Balancer for microservices"
+  type        = bool
+  default     = true
+}
+
+variable "microservices_load_balancer_internal" {
+  description = "Whether the load balancer is internal (private) or internet-facing"
+  type        = bool
+  default     = false
+}
+
+variable "microservices_enable_elastic_ips" {
+  description = "Enable Elastic IPs for microservices (one per service)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # Docker Registry Configuration
 # =============================================================================
@@ -381,4 +526,26 @@ variable "cloudwatch_log_retention_days" {
   description = "Number of days to retain CloudWatch logs"
   type        = number
   default     = 7
+}
+
+# =============================================================================
+# Service Account Overrides (for cross-account communication)
+# =============================================================================
+
+variable "database_host_override" {
+  description = "Database host IP (for service accounts connecting to hub account database)"
+  type        = string
+  default     = ""
+}
+
+variable "redis_host_override" {
+  description = "Redis host IP (for service accounts connecting to hub account redis)"
+  type        = string
+  default     = ""
+}
+
+variable "kong_endpoint_override" {
+  description = "Kong endpoint URL (for service accounts connecting to hub account Kong)"
+  type        = string
+  default     = ""
 }

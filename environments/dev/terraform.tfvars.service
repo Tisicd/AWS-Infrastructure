@@ -1,0 +1,125 @@
+# =============================================================================
+# Development Environment - Service Account Configuration
+# =============================================================================
+# Configuración para cuentas secundarias que solo despliegan microservicios
+# =============================================================================
+
+project_name = "academic-platform"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# =============================================================================
+# Multi-Account Configuration
+# =============================================================================
+account_type = "service"
+# account_id se detecta automáticamente
+
+# ID de la cuenta hub (REQUERIDO para service accounts)
+hub_account_id = "123456789012"  # Reemplazar con el Account ID real del hub
+
+# CIDR del VPC hub (para reglas de security group)
+hub_vpc_cidr = "10.0.0.0/16"  # Reemplazar con el CIDR real del VPC hub
+
+# =============================================================================
+# AWS Academy Constraints
+# =============================================================================
+max_elastic_ips = 5
+
+# =============================================================================
+# VPC Configuration (AWS Academy Pre-created)
+# =============================================================================
+vpc_id = "vpc-XXXXXXXX"  # Reemplazar con tu VPC ID de la service account
+
+# Public Subnets
+public_subnet_ids = [
+  # "subnet-XXXXXXXX",  # Reemplazar con tus subnet IDs
+]
+
+# Private Subnets (vacío si no existen)
+private_subnet_ids = []
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+your_ip_cidr        = "157.100.135.84/32"  # Cambiar a tu IP pública
+key_pair_name       = "academic-platform-key"
+create_key_pair     = true   # Terraform creará el key pair si no existe
+save_key_pair_locally = true  # Guardar clave privada localmente
+allowed_cidr_blocks = ["0.0.0.0/0"]  # Cambiar para producción
+
+# =============================================================================
+# Feature Toggles - Service Account Resources
+# =============================================================================
+# Service accounts NO deben crear estos recursos (solo en hub):
+enable_bastion       = false  # NO crear en service accounts
+enable_database      = false  # NO crear en service accounts
+enable_kong          = false  # NO crear en service accounts
+enable_microservices = true   # SÍ crear microservicios
+enable_nat_gateway   = false  # NO crear en service accounts
+
+# =============================================================================
+# Service Account Overrides (conexión a recursos del hub)
+# =============================================================================
+# Estas direcciones deben obtenerse de los outputs del despliegue del hub account
+database_host_override = "10.0.X.X"  # IP privada de la base de datos en hub account
+redis_host_override    = "10.0.X.X"  # IP privada de Redis en hub account (misma que DB)
+kong_endpoint_override = "http://10.0.X.X:8000"  # Endpoint de Kong en hub account
+
+# =============================================================================
+# Microservices Configuration
+# =============================================================================
+microservices_instance_type     = "t3.medium"
+microservices_in_private_subnet = false
+microservices_min_size          = 1
+microservices_max_size          = 4
+microservices_desired_capacity  = 2
+microservices_enable_scaling   = true
+microservices_scale_up_cpu       = 70
+microservices_scale_down_cpu    = 30
+
+# Lista de microservicios a desplegar en esta cuenta
+microservices_services = [
+  {
+    name  = "auth-service"
+    image = "auth-service:latest"
+    port  = 3001
+  },
+  {
+    name  = "student-profile-service"
+    image = "student-profile-service:latest"
+    port  = 3002
+  },
+  {
+    name  = "enrollment-service"
+    image = "enrollment-service:latest"
+    port  = 3003
+  },
+  # Agregar más microservicios según sea necesario
+]
+
+# =============================================================================
+# Docker Registry Configuration
+# =============================================================================
+docker_registry          = ""  # ECR o Docker Hub
+docker_registry_username = ""
+docker_registry_password = ""
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+enable_cloudwatch_alarms      = false
+create_sns_topic              = false
+monitoring_email_endpoints    = []
+cloudwatch_log_retention_days = 3
+
+# =============================================================================
+# Common Tags
+# =============================================================================
+common_tags = {
+  Environment = "Development"
+  ManagedBy   = "Terraform"
+  Project     = "Academic-Platform"
+  Academy     = "AWS-Learner-Lab"
+  Owner       = "cdtisalema@uce.edu.ec"
+  AccountType = "Service"
+}

@@ -1,0 +1,127 @@
+# =============================================================================
+# Development Environment - Hub Account Configuration
+# =============================================================================
+# Configuración para la cuenta central (hub) que aloja recursos compartidos
+# =============================================================================
+
+project_name = "academic-platform"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# =============================================================================
+# Multi-Account Configuration
+# =============================================================================
+account_type = "hub"
+# account_id se detecta automáticamente
+
+# =============================================================================
+# AWS Academy Constraints
+# =============================================================================
+max_elastic_ips = 5
+
+# =============================================================================
+# VPC Configuration (AWS Academy Pre-created)
+# =============================================================================
+vpc_id = "vpc-079f416cadf8211b3"  # Reemplazar con tu VPC ID
+
+# Public Subnets
+public_subnet_ids = [
+  "subnet-0a9de65d036c64afe",  # us-east-1a
+  "subnet-0d2d8cc7e8f2e424e"   # us-east-1b
+]
+
+# Private Subnets (vacío si no existen)
+private_subnet_ids = []
+
+# CIDR del VPC hub (necesario para comunicación con service accounts)
+# Obtener con: aws ec2 describe-vpcs --vpc-ids vpc-079f416cadf8211b3 --query 'Vpcs[0].CidrBlock'
+hub_vpc_cidr = "10.0.0.0/16"  # Reemplazar con el CIDR real de tu VPC
+
+# CIDR blocks de las VPCs de service accounts (para permitir comunicación)
+service_account_vpc_cidrs = [
+  # "10.1.0.0/16",  # Service Account 1 VPC CIDR
+  # "10.2.0.0/16",  # Service Account 2 VPC CIDR
+]
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+your_ip_cidr        = "157.100.135.84/32"  # Cambiar a tu IP pública
+key_pair_name       = "academic-platform-key"
+create_key_pair     = true   # Terraform creará el key pair si no existe
+save_key_pair_locally = true  # Guardar clave privada localmente
+allowed_cidr_blocks = ["0.0.0.0/0"]  # Cambiar para producción
+
+# =============================================================================
+# Feature Toggles - Hub Account Resources
+# =============================================================================
+enable_bastion       = true   # Solo en hub account
+enable_database      = true   # Solo en hub account
+enable_kong          = true   # Solo en hub account
+enable_microservices = false  # Opcional en hub, principalmente en service accounts
+enable_nat_gateway   = false  # Deshabilitado para ahorrar EIPs
+
+# =============================================================================
+# Bastion Host Configuration
+# =============================================================================
+bastion_instance_type = "t3.micro"
+
+# =============================================================================
+# Database Server Configuration
+# =============================================================================
+database_instance_type    = "t3.medium"
+database_in_private_subnet = false
+database_needs_eip         = false
+database_root_volume_size  = 30  # Minimum 30GB for Amazon Linux 2023
+database_data_volume_size  = 30
+postgres_version           = "15"
+redis_version              = "7.0"
+enable_timescaledb         = true
+database_enable_backups    = false
+database_backup_retention_days = 7
+
+# =============================================================================
+# Kong API Gateway Configuration
+# =============================================================================
+kong_instance_type  = "t3.medium"
+kong_instance_count = 1
+kong_version        = "3.5"
+
+# =============================================================================
+# Microservices Configuration (Opcional en hub)
+# =============================================================================
+microservices_instance_type     = "t3.medium"
+microservices_in_private_subnet = false
+microservices_min_size          = 1
+microservices_max_size          = 2
+microservices_desired_capacity   = 1
+microservices_enable_scaling     = false
+
+microservices_services = []
+
+# =============================================================================
+# Docker Registry Configuration
+# =============================================================================
+docker_registry          = ""
+docker_registry_username = ""
+docker_registry_password = ""
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+enable_cloudwatch_alarms      = false
+create_sns_topic              = false
+monitoring_email_endpoints    = []
+cloudwatch_log_retention_days = 3
+
+# =============================================================================
+# Common Tags
+# =============================================================================
+common_tags = {
+  Environment = "Development"
+  ManagedBy   = "Terraform"
+  Project     = "Academic-Platform"
+  Academy     = "AWS-Learner-Lab"
+  Owner       = "cdtisalema@uce.edu.ec"
+  AccountType = "Hub"
+}

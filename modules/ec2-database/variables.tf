@@ -37,6 +37,14 @@ variable "enable_timescaledb" {
   type = bool
   default = true
 }
+variable "enable_mongodb" {
+  type = bool
+  default = true
+}
+variable "mongodb_version" {
+  type = string
+  default = "7.0"
+}
 variable "enable_automated_backups" {
   type = bool
   default = true
@@ -49,6 +57,18 @@ variable "backup_s3_bucket" {
   type = string
   default = ""
 }
+variable "enable_asg" {
+  description = "Enable Auto Scaling Group for automatic instance recovery"
+  type        = bool
+  default     = true
+}
+
+variable "subnet_availability_zone" {
+  description = "Availability zone of the subnet (required for EBS volume creation when using ASG)"
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   type = map(string)
   default = {}

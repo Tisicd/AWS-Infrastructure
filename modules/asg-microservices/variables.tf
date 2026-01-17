@@ -78,3 +78,79 @@ variable "tags" {
   default = {}
 }
 
+# Load Balancer Configuration
+variable "enable_load_balancer" {
+  description = "Enable Application Load Balancer for microservices"
+  type        = bool
+  default     = true
+}
+
+variable "load_balancer_internal" {
+  description = "Whether the load balancer is internal (private) or internet-facing"
+  type        = bool
+  default     = false
+}
+
+variable "load_balancer_subnet_ids" {
+  description = "Subnet IDs for the load balancer (should be public subnets for internet-facing)"
+  type        = list(string)
+  default     = []
+}
+
+variable "load_balancer_security_group_ids" {
+  description = "Security group IDs for the load balancer"
+  type        = list(string)
+  default     = []
+}
+
+variable "load_balancer_listener_port" {
+  description = "Port for the load balancer listener"
+  type        = number
+  default     = 80
+}
+
+variable "load_balancer_listener_protocol" {
+  description = "Protocol for the load balancer listener"
+  type        = string
+  default     = "HTTP"
+}
+
+variable "target_group_port" {
+  description = "Port for the target group"
+  type        = number
+  default     = 3000
+}
+
+variable "target_group_protocol" {
+  description = "Protocol for the target group"
+  type        = string
+  default     = "HTTP"
+}
+
+variable "health_check_path" {
+  description = "Health check path for the target group"
+  type        = string
+  default     = "/health"
+}
+
+variable "health_check_matcher" {
+  description = "HTTP status codes to use when checking for a successful response"
+  type        = string
+  default     = "200"
+}
+
+# Elastic IP Configuration
+variable "enable_elastic_ips" {
+  description = "Enable Elastic IPs for microservices (one per service). EIPs will be automatically associated with instances via user-data."
+  type        = bool
+  default     = false
+}
+
+# Auto Recovery Configuration
+# Note: Auto-recovery is handled automatically by ASG health checks.
+# This variable is kept for backward compatibility but has no effect (ASG always handles recovery).
+variable "enable_auto_recovery" {
+  description = "Auto-recovery is handled automatically by ASG health checks (kept for backward compatibility)"
+  type        = bool
+  default     = true
+}

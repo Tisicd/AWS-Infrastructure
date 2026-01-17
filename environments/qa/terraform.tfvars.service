@@ -1,0 +1,144 @@
+# =============================================================================
+# QA Environment - Service Account Configuration
+# =============================================================================
+# Configuración para cuentas secundarias que solo despliegan microservicios
+# =============================================================================
+
+project_name = "academic-platform"
+environment  = "qa"
+aws_region   = "us-east-1"
+
+# =============================================================================
+# Multi-Account Configuration
+# =============================================================================
+account_type = "service"
+# account_id se detecta automáticamente
+
+# ID de la cuenta hub (REQUERIDO para service accounts)
+hub_account_id = "123456789012"  # Reemplazar con el Account ID real del hub
+
+# CIDR del VPC hub (para reglas de security group)
+hub_vpc_cidr = "172.31.0.0/16"  # Reemplazar con el CIDR real del VPC hub
+
+# =============================================================================
+# AWS Academy Constraints
+# =============================================================================
+max_elastic_ips = 5
+
+# =============================================================================
+# VPC Configuration (AWS Academy Pre-created)
+# =============================================================================
+vpc_id = "vpc-XXXXXXXX"  # Reemplazar con tu VPC ID de la service account
+
+# Public Subnets
+public_subnet_ids = [
+  # "subnet-XXXXXXXX",  # Reemplazar con tus subnet IDs
+]
+
+# Private Subnets (vacío si no existen)
+private_subnet_ids = []
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+your_ip_cidr        = "157.100.135.84/32"  # Cambiar a tu IP pública
+key_pair_name       = "academic-platform-key"
+create_key_pair     = true   # Terraform creará el key pair si no existe
+save_key_pair_locally = true  # Guardar clave privada localmente
+allowed_cidr_blocks = ["0.0.0.0/0"]  # Cambiar para producción
+
+# =============================================================================
+# Feature Toggles - Service Account Resources
+# =============================================================================
+# Service accounts NO deben crear estos recursos (solo en hub):
+enable_bastion       = false  # NO crear en service accounts
+enable_database      = false  # NO crear en service accounts
+enable_kong          = false  # NO crear en service accounts
+enable_microservices = true   # SÍ crear microservicios
+enable_nat_gateway   = false  # NO crear en service accounts
+
+# =============================================================================
+# Service Account Overrides (conexión a recursos del hub)
+# =============================================================================
+# Estas direcciones deben obtenerse de los outputs del despliegue del hub account
+database_host_override = "10.0.X.X"  # IP privada de la base de datos en hub account
+redis_host_override    = "10.0.X.X"  # IP privada de Redis en hub account (misma que DB)
+kong_endpoint_override = "http://10.0.X.X:8000"  # Endpoint de Kong en hub account
+
+# =============================================================================
+# Microservices Configuration
+# =============================================================================
+microservices_instance_type     = "t3.medium"
+microservices_in_private_subnet = false
+microservices_min_size          = 4  # Mínimo 4 instancias (una por microservicio)
+microservices_max_size          = 8  # Máximo 8 instancias (escalado)
+microservices_desired_capacity  = 4  # 4 microservicios por cuenta (una instancia por servicio)
+microservices_enable_scaling   = true
+microservices_scale_up_cpu       = 70
+microservices_scale_down_cpu    = 30
+
+# Load Balancer Configuration
+microservices_enable_load_balancer = true
+microservices_load_balancer_internal = false
+
+# Elastic IPs Configuration (uno por servicio)
+# EIPs serán asociados automáticamente con instancias via user-data script
+microservices_enable_elastic_ips = true
+
+# Lista de microservicios a desplegar en esta cuenta
+# NOTA: Esta es la configuración para la PRIMERA service account (puertos 3001-3004)
+# Para otras service accounts, actualizar los microservicios según corresponda:
+# - Service Account 1: auth-service (3001), student-profile-service (3002), enrollment-service (3005), subject-catalog-service (3004)
+# - Service Account 2: interactive-exercise-service (3003), assessment-service (3006), recommendation-service (3007), academic-progress-service (3008)
+# - Service Account 3: analytics-service (3009), notification-service (3010)
+microservices_services = [
+  {
+    name  = "auth-service"
+    image = "auth-service:latest"
+    port  = 3001
+  },
+  {
+    name  = "student-profile-service"
+    image = "student-profile-service:latest"
+    port  = 3002
+  },
+  {
+    name  = "enrollment-service"
+    image = "enrollment-service:latest"
+    port  = 3005
+  },
+  {
+    name  = "subject-catalog-service"
+    image = "subject-catalog-service:latest"
+    port  = 3004
+  }
+]
+
+# =============================================================================
+# Docker Registry Configuration
+# =============================================================================
+docker_registry          = ""  # ECR o Docker Hub
+docker_registry_username = ""
+docker_registry_password = ""
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+# Nota: El módulo de monitoreo solo se ejecuta en el hub account
+# En service accounts, el monitoreo se gestiona desde el hub
+enable_cloudwatch_alarms      = false  # Deshabilitado en service accounts
+create_sns_topic              = false  # SNS topics solo en hub account
+monitoring_email_endpoints    = []
+cloudwatch_log_retention_days = 7
+
+# =============================================================================
+# Common Tags
+# =============================================================================
+common_tags = {
+  Environment = "QA"
+  ManagedBy   = "Terraform"
+  Project     = "Academic-Platform"
+  Academy     = "AWS-Learner-Lab"
+  Owner       = "cdtisalema@uce.edu.ec"
+  AccountType = "Service"
+}

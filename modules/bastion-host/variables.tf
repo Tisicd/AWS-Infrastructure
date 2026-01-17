@@ -36,6 +36,18 @@ variable "allocate_eip" {
   default = true
 }
 
+variable "root_volume_size" {
+  description = "Size of root volume in GB"
+  type        = number
+  default     = 30  # Amazon Linux 2023 AMI requires minimum 30GB
+}
+
+variable "enable_asg" {
+  description = "Enable Auto Scaling Group for automatic instance recovery"
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

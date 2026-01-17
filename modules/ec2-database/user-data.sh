@@ -12,6 +12,12 @@ exec 2>&1
 set -x  # Enable debug mode
 echo "Starting database server initialization at $(date)"
 
+# Variables from Terraform
+EIP_ALLOCATION_ID="${eip_allocation_id}"
+ASSOCIATE_EIP="${associate_eip}"
+DATA_VOLUME_ID="${data_volume_id}"
+ATTACH_DATA_VOLUME="${attach_data_volume}"
+
 # Update system
 echo "Updating system packages..."
 yum update -y
@@ -27,6 +33,75 @@ usermod -a -G docker ec2-user
 echo "Installing Docker Compose..."
 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
+
+# Associate Elastic IP if ASG is enabled
+# This is MANDATORY - EIP must always be associated
+if [ "$ASSOCIATE_EIP" = "true" ] && [ -n "$EIP_ALLOCATION_ID" ]; then
+    echo "Starting EIP association process..."
+    INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+    REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+    
+    echo "Instance ID: $INSTANCE_ID"
+    echo "EIP Allocation ID: $EIP_ALLOCATION_ID"
+    echo "Region: $REGION"
+    
+    # Wait for AWS CLI to be ready and instance to be fully initialized
+    echo "Waiting for instance to be ready..."
+    sleep 15
+    
+    # Disassociate EIP from any existing instance (with retries)
+    echo "Disassociating EIP from any existing instance..."
+    for i in {1..3}; do
+        aws ec2 disassociate-address --allocation-id "$EIP_ALLOCATION_ID" --region "$REGION" 2>&1 | tee -a /var/log/eip-association.log || true
+        sleep 5
+    done
+    
+    # Associate EIP with this instance (with retries)
+    echo "Associating EIP with instance..."
+    MAX_RETRIES=5
+    RETRY_COUNT=0
+    SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
+        if aws ec2 associate-address --instance-id "$INSTANCE_ID" --allocation-id "$EIP_ALLOCATION_ID" --region "$REGION" --allow-reassociation 2>&1 | tee -a /var/log/eip-association.log; then
+            echo "EIP successfully associated on attempt $((RETRY_COUNT + 1))" | tee -a /var/log/eip-association.log
+            SUCCESS=true
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "EIP association attempt $RETRY_COUNT failed, retrying in 10 seconds..." | tee -a /var/log/eip-association.log
+            sleep 10
+        fi
+    done
+    
+    if [ "$SUCCESS" = false ]; then
+        echo "ERROR: Failed to associate EIP after $MAX_RETRIES attempts" | tee -a /var/log/eip-association.log
+    else
+        echo "EIP association completed successfully" | tee -a /var/log/eip-association.log
+    fi
+elif [ -z "$EIP_ALLOCATION_ID" ]; then
+    echo "WARNING: EIP_ALLOCATION_ID is empty, skipping EIP association" | tee -a /var/log/eip-association.log
+fi
+
+# Attach data volume if ASG is enabled
+if [ "$ATTACH_DATA_VOLUME" = "true" ] && [ -n "$DATA_VOLUME_ID" ]; then
+    INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+    REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+    
+    echo "Attaching data volume: $DATA_VOLUME_ID"
+    
+    # Wait for instance to be ready
+    sleep 10
+    
+    # Attach volume
+    aws ec2 attach-volume --volume-id "$DATA_VOLUME_ID" --instance-id "$INSTANCE_ID" --device /dev/sdf --region "$REGION"
+    
+    # Wait for volume to attach
+    echo "Waiting for volume to attach..."
+    sleep 20
+    
+    # Refresh block device list
+    echo "Refreshing block device list..."
+fi
 
 # Detect and format additional EBS volume
 echo "Detecting additional EBS volumes..."
@@ -111,6 +186,7 @@ echo "Creating data directories..."
 mkdir -p /data/postgres
 mkdir -p /data/redis
 mkdir -p /data/timescaledb
+mkdir -p /data/mongodb
 mkdir -p /data/backups
 chown -R ec2-user:docker /data
 
@@ -171,6 +247,26 @@ services:
       timeout: 5s
       retries: 5
 %{ endif }
+
+%{ if enable_mongodb }
+  mongodb:
+    image: mongo:${mongodb_version}
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: $${MONGO_ROOT_PASSWORD:-mongodb_password_change_me}
+      MONGO_INITDB_DATABASE: academic_platform
+    volumes:
+      - /data/mongodb:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+%{ endif }
 EOF
 
 # Start databases
@@ -204,9 +300,17 @@ docker exec postgres pg_dumpall -U postgres | gzip > $BACKUP_DIR/postgres_$DATE.
 docker exec redis redis-cli --rdb /data/dump.rdb
 cp /data/redis/dump.rdb $BACKUP_DIR/redis_$DATE.rdb
 
+%{ if enable_mongodb }
+# Backup MongoDB
+docker exec mongodb mongodump --archive=$BACKUP_DIR/mongodb_$DATE.archive || echo "MongoDB backup failed"
+%{ endif }
+
 # Keep only last 7 days
 find $BACKUP_DIR -name "postgres_*.sql.gz" -mtime +7 -delete
 find $BACKUP_DIR -name "redis_*.rdb" -mtime +7 -delete
+%{ if enable_mongodb }
+find $BACKUP_DIR -name "mongodb_*.archive" -mtime +7 -delete
+%{ endif }
 BACKUP
 chmod +x /opt/backup-databases.sh
 
@@ -222,6 +326,7 @@ Environment: ${environment}
 PostgreSQL: port 5432
 Redis: port 6379
 %{ if enable_timescaledb }TimescaleDB: port 5433%{ endif }
+%{ if enable_mongodb }MongoDB: port 27017%{ endif }
 ================================================
 WELCOME
 
